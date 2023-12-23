@@ -2,11 +2,16 @@ import telebot
 from telebot import types
 from modules.database_manager import DatabaseManager
 from modules.encryption_utils import encrypt, decrypt
-import base64
 import mysql.connector
+import logging
+
 
 # Состояния для отслеживания контекста диалога
 states = {}
+
+# Настройка логирования
+logging.basicConfig(filename='bot_logs.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 
 
 # Создаем экземпляр DatabaseManager
@@ -16,10 +21,9 @@ db_manager = DatabaseManager(host="localhost", user="root", password="root", dat
 try:
     db_manager.connect()
     db_manager.create_table()
-
+    logging.info("Connected to the database and created table.")
 except mysql.connector.Error as err:
-    print(f"Error: {err}")
-
+    logging.error(f"Error: {err}")
 finally:
     db_manager.disconnect()
 
@@ -30,6 +34,11 @@ bot = telebot.TeleBot(TOKEN)
 # Обработчик команды /start
 @bot.message_handler(commands=['start'])
 def handle_start(message):
+    user_info = f"User ID: {message.from_user.id}, Username: {message.from_user.username}, " \
+                f"First Name: {message.from_user.first_name}, Last Name: {message.from_user.last_name}"
+
+    logging.info(user_info)
+
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     btn_enc = types.KeyboardButton('Encrypt text')
     btn_des = types.KeyboardButton('Decrypt text')
@@ -127,6 +136,7 @@ def handle_decrypt_key(message):
         decryption_key = message.text
 
         if not decryption_key.isdigit():
+            logging.warning('Invalid numeric key entered.')
             bot.send_message(message.chat.id, 'Please enter a valid numeric key.')
             return
 
@@ -144,9 +154,11 @@ def handle_decrypt_key(message):
             with open('decrypted_text.txt', 'rb') as file:
                 bot.send_document(message.chat.id, file)
         else:
+            logging.info('No data found for the given key.')
             bot.send_message(message.chat.id, 'No data found for the given key.')
 
     except ValueError as e:
+        logging.error(f'Error: {str(e)}')
         bot.send_message(message.chat.id, f'Error: {str(e)}')
 
     finally:
